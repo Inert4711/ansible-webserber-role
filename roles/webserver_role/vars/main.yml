@@ -1,0 +1,10 @@
+---
+db_user: "{{ vault_db_user }}"
+db_password: "{{ vault_db_password }}"
+packages:
+  - nginx
+  - python3
+  - python3-pip
+  - postgresql
+  - postgresql-contrib
+  - python3-psycopg2

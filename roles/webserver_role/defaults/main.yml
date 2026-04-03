@@ -1,0 +1,4 @@
+---
+nginx_port: 80
+app_name: "WebServer"
+app_path: "/var/www/myapp"

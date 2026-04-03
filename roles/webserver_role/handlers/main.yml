@@ -1,0 +1,10 @@
+---
+- name: Перезапуск Nginx
+  systemd:
+    name: nginx
+    state: restarted
+  
+- name: Перезапустить Flask
+  systemd:
+    name: flask
+    state: restarted

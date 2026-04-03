@@ -1,0 +1,126 @@
+- name: Установка пакетов
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop: "{{ packages }}"
+
+- name: Установка PostgreSQL Python adapter
+  apt:
+    name: python3-psycopg2
+    state: present
+
+- name: Убедиться, что PostgreSQL запущен
+  systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Создание пользователя БД
+  postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    role_attr_flags: LOGIN
+    state: present
+    login_host: "127.0.0.1"
+    login_port: "5432"
+    login_user: "postgres"
+    login_password: "mysecretpassword"
+
+- name: Создание базы данных
+  postgresql_db:
+    name: "{{ vault_db_name }}"
+    owner: "{{ vault_db_user }}"
+    state: present
+    login_host: "127.0.0.1"
+    login_port: "5432"
+    login_user: "postgres"
+    login_password: "mysecretpassword"
+
+- name: Создание таблицы (через SQL)
+  postgresql_query:
+    db: "{{ vault_db_name }}"
+    login_host: "127.0.0.1"
+    login_port: "5432"
+    login_user: "postgres"
+    login_password: "mysecretpassword"
+    query: |
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+- name: Создание директории приложения
+  file:
+    path: "{{ app_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Копирование фронтенда
+  copy:
+    src: app.py
+    dest: "{{ app_path }}/app.py"
+    mode: "0644"
+
+- name: Копирование Flask приложения
+  copy:
+    src: app.py
+    dest: "{{ app_path }}/app.py"
+    mode: '0644'
+
+- name: Создание виртуального окружения
+  command: python3 -m venv {{ app_path }}/venv
+  args:
+    creates: "{{ app_path }}/venv/bin/activate"
+  become: true
+
+- name: Установка прав на виртуальное окружение
+  file:
+    path: "{{ app_path }}/venv"
+    state: directory
+    recurse: true
+  become: true
+
+- name: Установка зависимостей в виртуальное окружение
+  pip:
+    name: "{{ item }}"
+    state: present
+    virtualenv: "{{ app_path }}/venv"
+  loop:
+    - flask
+    - psycopg2-binary
+    - gunicorn
+  become: true
+
+- name: Создание systemd unit для Flask
+  template:
+    src: flask.service.j2
+    dest: /etc/systemd/system/flask.service
+    mode: '0644'
+  notify: Перезапустить Flask
+
+- name: Включение и запуск сервиса Flask
+  systemd:
+    name: flask
+    enabled: true
+    state: started
+
+- name: Настроить Nginx с помощью шаблона
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/myapp
+    mode: '0644'
+  notify: Перезапуск Nginx
+
+- name: Деактивировать стандартный конфиг Nginx
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Активировать конфигурацию Nginx
+  file:
+    src: /etc/nginx/sites-available/myapp
+    dest: /etc/nginx/sites-enabled/myapp
+    state: link

@@ -1,0 +1,7 @@
+---
+- hosts: localhost
+  become: true
+  vars_files:
+    - webserver_role/vars/vault.yml
+  roles:
+    - webserver_role
